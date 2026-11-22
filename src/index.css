@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 26% 5%;
+    --foreground: 44 22% 92%;
+    --card: 220 22% 8%;
+    --card-foreground: 44 22% 92%;
+    --popover: 220 24% 8%;
+    --popover-foreground: 44 22% 92%;
+    --primary: 38 84% 56%;
+    --primary-foreground: 222 30% 7%;
+    --secondary: 220 16% 14%;
+    --secondary-foreground: 44 20% 90%;
+    --muted: 220 16% 12%;
+    --muted-foreground: 219 12% 62%;
+    --accent: 220 16% 14%;
+    --accent-foreground: 44 22% 92%;
+    --destructive: 4 72% 56%;
+    --destructive-foreground: 44 22% 94%;
+    --border: 220 14% 16%;
+    --input: 220 14% 20%;
+    --ring: 38 84% 56%;
+    --radius: 0.75rem;
+    --sidebar-background: 220 22% 7%;
+    --sidebar-foreground: 44 22% 92%;
+    --sidebar-primary: 38 84% 56%;
+    --sidebar-primary-foreground: 222 30% 7%;
+    --sidebar-accent: 220 16% 14%;
+    --sidebar-accent-foreground: 44 22% 92%;
+    --sidebar-border: 220 14% 16%;
+    --sidebar-ring: 38 84% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    scrollbar-color: hsl(220 14% 24%) hsl(222 26% 5%);
+  }
+  body {
+    @apply bg-background text-foreground font-display antialiased;
+    font-feature-settings: "ss01", "cv11";
+    overflow-x: clip;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.85);
+    color: hsl(var(--primary-foreground));
+  }
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  }
+  .font-mono {
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Blueprint grid backdrop */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, hsl(220 14% 16% / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(220 14% 16% / 0.5) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+  .bg-grid-fade {
+    mask-image: radial-gradient(ellipse 90% 70% at 50% 30%, black 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 30%, black 30%, transparent 75%);
+  }
+
+  /* Film grain */
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+  }
+
+  /* Mouse spotlight card */
+  .spotlight-card {
+    position: relative;
+    overflow: hidden;
+  }
+  .spotlight-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
+    background: radial-gradient(
+      340px circle at var(--mx, 50%) var(--my, 50%),
+      hsl(var(--primary) / 0.13),
+      transparent 65%
+    );
+    pointer-events: none;
+  }
+  .spotlight-card:hover::before,
+  .spotlight-card:focus-within::before {
+    opacity: 1;
+  }
+
+  /* Infinite marquee */
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .animate-marquee {
+    animation: marquee 36s linear infinite;
+  }
+  .marquee-paused:hover .animate-marquee {
+    animation-play-state: paused;
+  }
+
+  /* Hero glow drift (transform/opacity only) */
+  @keyframes glow-drift {
+    0%, 100% {
+      transform: translate3d(-4%, -2%, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(4%, 3%, 0) scale(1.06);
+    }
+  }
+  .animate-glow-drift {
+    animation: glow-drift 14s ease-in-out infinite;
+  }
+
+  /* Scroll hint line */
+  @keyframes scroll-hint {
+    0% {
+      transform: scaleY(0);
+      transform-origin: top;
+    }
+    45% {
+      transform: scaleY(1);
+      transform-origin: top;
+    }
+    55% {
+      transform: scaleY(1);
+      transform-origin: bottom;
+    }
+    100% {
+      transform: scaleY(0);
+      transform-origin: bottom;
+    }
+  }
+  .animate-scroll-hint {
+    animation: scroll-hint 1.8s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee,
+  .animate-glow-drift,
+  .animate-scroll-hint {
+    animation: none;
+  }
+}
