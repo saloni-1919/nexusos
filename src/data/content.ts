@@ -3,6 +3,7 @@ export const NAV_LINKS = [
   { label: 'The Loop', hash: '#loop' },
   { label: 'Engine', hash: '#engine' },
   { label: 'Studio', hash: '#studio' },
+  { label: 'Operations', hash: '#operations' },
   { label: 'Automation', hash: '#automation' },
   { label: 'Flaws', hash: '#flaws' },
   { label: 'Roadmap', hash: '#roadmap' },

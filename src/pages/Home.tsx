@@ -8,6 +8,7 @@ import { Loop } from '@/sections/Loop'
 import { Engine } from '@/sections/Engine'
 import { Scorecard } from '@/sections/Scorecard'
 import { DataStudio } from '@/sections/DataStudio'
+import { Operations } from '@/sections/Operations'
 import { Automation } from '@/sections/Automation'
 import { Flaws } from '@/sections/Flaws'
 import { Roadmap } from '@/sections/Roadmap'
@@ -34,6 +35,7 @@ export default function Home() {
         <Engine />
         <Scorecard />
         <DataStudio />
+        <Operations />
         <Automation />
         <Flaws />
         <Roadmap />
