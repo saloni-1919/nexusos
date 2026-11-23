@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useLenis } from '@/hooks/useLenis'
 import { ScrollTrigger } from '@/lib/gsapSetup'
+import { OpsProvider } from '@/lib/opsStore'
 import { Nav } from '@/sections/Nav'
 import { Hero } from '@/sections/Hero'
 import { Pillars } from '@/sections/Pillars'
@@ -9,6 +10,7 @@ import { Engine } from '@/sections/Engine'
 import { Scorecard } from '@/sections/Scorecard'
 import { DataStudio } from '@/sections/DataStudio'
 import { Operations } from '@/sections/Operations'
+import { Dashboard } from '@/sections/Dashboard'
 import { Automation } from '@/sections/Automation'
 import { Flaws } from '@/sections/Flaws'
 import { Roadmap } from '@/sections/Roadmap'
@@ -35,7 +37,10 @@ export default function Home() {
         <Engine />
         <Scorecard />
         <DataStudio />
-        <Operations />
+        <OpsProvider>
+          <Operations />
+          <Dashboard />
+        </OpsProvider>
         <Automation />
         <Flaws />
         <Roadmap />

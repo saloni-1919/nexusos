@@ -35,6 +35,8 @@ export interface OpsState {
   orders: PurchaseOrder[]
   events: OpsEvent[]
   nextPoNum: number
+  /** product SKUs whose low-stock alert has been dismissed; re-arms when stock recovers */
+  dismissedAlerts: string[]
 }
 
 export const OPS_KEY = 'nexusos-ops-v1'
@@ -81,13 +83,19 @@ export function initialOpsState(): OpsState {
       { at: '10:03:15', text: 'PO-1019 created — awaiting approval', tone: 'info' },
       { at: '09:12:40', text: 'PO-1018 approved by Finance', tone: 'ok' },
     ],
+    dismissedAlerts: [],
   }
 }
 
 export function loadOpsState(): OpsState {
   try {
     const raw = localStorage.getItem(OPS_KEY)
-    if (raw) return JSON.parse(raw) as OpsState
+    if (raw) {
+      const parsed = JSON.parse(raw) as OpsState
+      // migrate states persisted by older versions
+      if (!Array.isArray(parsed.dismissedAlerts)) parsed.dismissedAlerts = []
+      return parsed
+    }
   } catch {
     /* corrupted or unavailable storage → fresh state */
   }
@@ -136,7 +144,7 @@ export function receivePO(state: OpsState, id: string): OpsState {
   const po = state.orders.find((o) => o.id === id)
   if (!po || po.status !== 'approved') return state
   const product = state.products.find((p) => p.sku === po.productSku)
-  return {
+  const next: OpsState = {
     ...state,
     orders: state.orders.map((o) => (o.id === id ? { ...o, status: 'received' as const } : o)),
     products: state.products.map((p) => (p.sku === po.productSku ? { ...p, stock: p.stock + po.qty } : p)),
@@ -145,6 +153,7 @@ export function receivePO(state: OpsState, id: string): OpsState {
       ...state.events,
     ].slice(0, 30),
   }
+  return { ...next, dismissedAlerts: rearmAlerts(next) }
 }
 
 export interface OpsKpis {
@@ -161,4 +170,27 @@ export function computeKpis(state: OpsState): OpsKpis {
     lowStock: state.products.filter((p) => p.stock < p.reorderPoint).length,
     pendingApprovals: state.orders.filter((o) => o.status === 'pending').length,
   }
+}
+
+/** Low-stock products whose alert is currently active (not dismissed). */
+export function activeAlerts(state: OpsState): Product[] {
+  return state.products.filter((p) => p.stock < p.reorderPoint && !state.dismissedAlerts.includes(p.sku))
+}
+
+/** Dismiss a low-stock alert. It re-arms automatically if the stock recovers and drops again. */
+export function dismissAlert(state: OpsState, sku: string): OpsState {
+  if (state.dismissedAlerts.includes(sku)) return state
+  return {
+    ...state,
+    dismissedAlerts: [...state.dismissedAlerts, sku],
+    events: [{ at: now(), text: `Low-stock alert for ${sku} acknowledged`, tone: 'warn' as const }, ...state.events].slice(0, 30),
+  }
+}
+
+// Re-arm dismissed alerts once stock is back above the reorder point.
+function rearmAlerts(state: OpsState): string[] {
+  return state.dismissedAlerts.filter((sku) => {
+    const p = state.products.find((x) => x.sku === sku)
+    return p ? p.stock < p.reorderPoint : false
+  })
 }

@@ -4,6 +4,7 @@ export const NAV_LINKS = [
   { label: 'Engine', hash: '#engine' },
   { label: 'Studio', hash: '#studio' },
   { label: 'Operations', hash: '#operations' },
+  { label: 'Dashboard', hash: '#dashboard' },
   { label: 'Automation', hash: '#automation' },
   { label: 'Flaws', hash: '#flaws' },
   { label: 'Roadmap', hash: '#roadmap' },

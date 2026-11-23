@@ -5,16 +5,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SplitText } from '@/components/reactbits/SplitText'
 import { Reveal } from '@/components/Reveal'
-import {
-  approvePO,
-  computeKpis,
-  createPO,
-  initialOpsState,
-  loadOpsState,
-  receivePO,
-  saveOpsState,
-  type POStatus,
-} from '@/lib/ops'
+import { computeKpis, type POStatus } from '@/lib/ops'
+import { useOps } from '@/lib/opsStore'
 import { cn } from '@/lib/utils'
 
 const STATUS_STYLE: Record<POStatus, string> = {
@@ -24,13 +16,11 @@ const STATUS_STYLE: Record<POStatus, string> = {
 }
 
 export function Operations() {
-  const [state, setState] = useState(loadOpsState)
+  const { state, createPO, approvePO, receivePO, resetDemo } = useOps()
   const [supplierId, setSupplierId] = useState('')
   const [productSku, setProductSku] = useState('')
   const [qty, setQty] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
-
-  useEffect(() => saveOpsState(state), [state])
 
   // hydrate form defaults once state is known
   useEffect(() => {
@@ -49,11 +39,9 @@ export function Operations() {
     if (!Number.isFinite(qtyNum) || qtyNum <= 0 || !Number.isInteger(qtyNum))
       return setFormError('Quantity must be a positive whole number.')
     setFormError(null)
-    setState((s) => createPO(s, supplierId, productSku, qtyNum))
+    createPO(supplierId, productSku, qtyNum)
     setQty('')
   }
-
-  const resetDemo = () => setState(initialOpsState())
 
   return (
     <section id="operations" className="border-y border-border bg-card/40">
@@ -215,7 +203,7 @@ export function Operations() {
                       {o.status === 'pending' && (
                         <Button
                           size="sm"
-                          onClick={() => setState((st) => approvePO(st, o.id))}
+                          onClick={() => approvePO(o.id)}
                           className="h-8 cursor-pointer rounded-md bg-primary px-3 font-mono text-[11px] uppercase tracking-[0.06em] text-primary-foreground hover:bg-primary/85"
                         >
                           <Check className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
@@ -226,7 +214,7 @@ export function Operations() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setState((st) => receivePO(st, o.id))}
+                          onClick={() => receivePO(o.id)}
                           className="h-8 cursor-pointer rounded-md border-signal/50 bg-transparent px-3 font-mono text-[11px] uppercase tracking-[0.06em] text-signal hover:bg-signal/10"
                         >
                           <Truck className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
