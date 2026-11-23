@@ -6,7 +6,8 @@
 
 A scroll-driven product site for a unified business operating platform —
 ERP · Business Intelligence · Workflow Automation · AI decision support —
-featuring a **fully working in-browser CSV Data Studio**.
+featuring **fully working in-browser demos**: a universal Data Studio
+(CSV · Excel · JSON · TSV, any domain), an operations core and a live dashboard.
 
 [![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-saloni--1919.github.io%2Fnexusos-e8a93d?style=for-the-badge)](https://saloni-1919.github.io/nexusos/)
 [![React](https://img.shields.io/badge/React_19-61dafb?style=flat-square&logo=react&logoColor=black)](https://react.dev)
@@ -25,6 +26,7 @@ featuring a **fully working in-browser CSV Data Studio**.
 - [Live demo](#-live-demo)
 - [What's inside](#-whats-inside)
 - [The Data Studio — try it](#-the-data-studio--try-it)
+- [Operations & dashboard — the closed loop](#️-operations--dashboard--the-closed-loop)
 - [Quick start](#-quick-start)
 - [How the scroll engine works](#-how-the-scroll-engine-works)
 - [Project structure](#-project-structure)
@@ -49,7 +51,9 @@ Scroll it. Every section is choreographed — and the **Studio** section in the 
 | **The Operating Loop** | A **pinned, scroll-scrubbed** sequence: Operate → Data → Insight → Action, with a progress spine |
 | **Analytics Engine** | Four analytics levels + a semantic-layer metric registry |
 | **KPI Scorecard** | Count-up KPIs, animated SVG revenue chart, and ⓘ popovers exposing each metric's formula, owner, source and refresh cadence |
-| **Data Studio** | Working CSV profiling, validation and charting — see below |
+| **Data Studio** | Universal data intake — CSV, Excel, JSON, TSV from any domain — with profiling, quarantine and charting |
+| **Operations** | Working procurement loop: create → approve → receive POs, inventory updates in the same transaction |
+| **Dashboard** | Live charts from your transactions, threshold alerts, one-click auto-reorder, management report export |
 | **Automation** | Workflow timeline whose spine draws itself as you scroll |
 | **Flaws** | Accordion of the five classic ERP/BI failure modes and their mitigations |
 | **Roadmap & Assessment** | Phase plan with exit criteria; animated score bars |
@@ -74,11 +78,29 @@ running **100% client-side**. No upload, no server — your file never leaves th
 ![Data Studio](docs/assets/studio.jpg)
 
 1. Open the [live demo](https://saloni-1919.github.io/nexusos/) → **Studio** in the nav
-2. Drop any CSV — or click **Try sample data** (120 orders with deliberate defects)
+2. Drop **any tabular file** — `.csv` · `.xlsx` / `.xls` · `.json` · `.tsv` / `.txt` —
+   or pick a sample dataset: **Sales** (CSV), **People/HR** (JSON) or **Marketing** (CSV),
+   each with deliberate defects
 3. Get instant **column profiling**: type detection, missing / unique / invalid counts
 4. See the **data quality center**: quarantined rows with exact reasons — never silently changed
 5. Build a chart: **group by** any column, pick a **measure**, switch **sum / avg / count**
 6. Export a **cleaned CSV** with quarantined rows removed
+
+The profiler is domain-agnostic: it works on whatever columns your file brings —
+sales orders, employee rosters, campaign stats, sensor logs.
+
+## ⚙️ Operations & dashboard — the closed loop
+
+Two more live demos share one persistent state (localStorage — reset anytime):
+
+1. **Operations**: create a purchase order → approve it → receive it. Inventory and
+   KPIs update in the same motion; every step lands in the audit feed
+2. **Dashboard**: charts render from *your* transactions. When stock drops below its
+   reorder point a **threshold alert** fires — acknowledge it, or click
+   **Auto-reorder** and the alert turns into an approval-gated PO for the exact
+   shortfall with the product's preferred supplier (duplicates are blocked)
+3. **Export report**: a dated management snapshot (KPIs, inventory position, open POs,
+   active alerts, audit trail) downloads as Markdown
 
 ## ⚡ Quick start
 
@@ -140,7 +162,10 @@ src/
 ├── lib/
 │   ├── gsapSetup.ts         # GSAP + ScrollTrigger registration
 │   ├── scroll.ts            # Lenis singleton + smooth anchor scrolling
-│   └── csvProfile.ts        # CSV profiling / validation / quarantine engine
+│   ├── dataProfile.ts       # universal intake: CSV/TSV/JSON/Excel → profiling, validation, quarantine
+│   ├── ops.ts               # operations state machine: POs, inventory, alerts, auto-reorder
+│   ├── opsStore.tsx         # shared ops state (context + localStorage)
+│   └── report.ts            # management report (Markdown) generator
 ├── hooks/
 │   ├── useLenis.ts          # smooth-scroll lifecycle
 │   └── useReducedMotion.ts
@@ -151,6 +176,7 @@ src/
 ├── sections/                # one file per page section
 │   ├── Nav.tsx      Hero.tsx       Pillars.tsx   Loop.tsx
 │   ├── Engine.tsx   Scorecard.tsx  DataStudio.tsx
+│   ├── Operations.tsx  Dashboard.tsx
 │   ├── Automation.tsx  Flaws.tsx   Roadmap.tsx
 │   └── Assessment.tsx  Pilot.tsx   Footer.tsx
 └── pages/Home.tsx           # section composition
@@ -172,7 +198,7 @@ src/
 | Scroll | Lenis |
 | Animation | GSAP + ScrollTrigger |
 | Charts | Recharts · custom SVG |
-| CSV | Papa Parse |
+| Data intake | Papa Parse (CSV/TSV) · SheetJS (Excel, lazy-loaded) · native JSON |
 | Type | Space Grotesk · IBM Plex Mono (self-hosted via Fontsource) |
 | Hosting | GitHub Pages |
 

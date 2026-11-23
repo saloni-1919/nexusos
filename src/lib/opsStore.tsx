@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import {
   approvePO,
   createPO,
+  createReorderPO,
   dismissAlert,
   initialOpsState,
   loadOpsState,
@@ -16,6 +17,7 @@ interface OpsStore {
   approvePO: (id: string) => void
   receivePO: (id: string) => void
   dismissAlert: (sku: string) => void
+  reorderPO: (sku: string) => void
   resetDemo: () => void
 }
 
@@ -33,6 +35,7 @@ export function OpsProvider({ children }: { children: ReactNode }) {
     approvePO: (id) => setState((s) => approvePO(s, id)),
     receivePO: (id) => setState((s) => receivePO(s, id)),
     dismissAlert: (sku) => setState((s) => dismissAlert(s, sku)),
+    reorderPO: (sku) => setState((s) => createReorderPO(s, sku)),
     resetDemo: () => setState(initialOpsState()),
   }
 

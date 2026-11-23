@@ -4,7 +4,15 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { Button } from '@/components/ui/button'
 import { SplitText } from '@/components/reactbits/SplitText'
 import { Reveal } from '@/components/Reveal'
-import { analyzeCsv, exportCleanCsv, sampleCsv, type AnalysisResult } from '@/lib/csvProfile'
+import {
+  ACCEPT_ATTR,
+  SAMPLE_DATASETS,
+  analyzeExcelFile,
+  analyzeText,
+  detectFormat,
+  exportCleanCsv,
+  type AnalysisResult,
+} from '@/lib/dataProfile'
 import { cn } from '@/lib/utils'
 
 const TYPE_BADGE: Record<string, string> = {
@@ -20,53 +28,65 @@ export function DataStudio() {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [dimension, setDimension] = useState('')
   const [measure, setMeasure] = useState('')
   const [agg, setAgg] = useState<Agg>('sum')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const ingest = useCallback((text: string, name: string) => {
-    try {
-      const analysis = analyzeCsv(text, name)
-      if (analysis.fields.length === 0 || analysis.rows.length === 0) {
-        setError('No usable rows found. Make sure the file is a CSV with a header row.')
-        setResult(null)
+  const applyResult = useCallback((analysis: AnalysisResult) => {
+    if (analysis.fields.length === 0 || analysis.rows.length === 0) {
+      setError('No usable records found. The file needs a header row or an array of objects.')
+      setResult(null)
+      return
+    }
+    setError(null)
+    setResult(analysis)
+    setDimension(
+      analysis.profiles.find((p) => p.type === 'string')?.name ??
+        analysis.profiles.find((p) => p.type === 'date')?.name ??
+        analysis.fields[0],
+    )
+    setMeasure(
+      analysis.profiles.find((p) => p.type === 'number' && !/_?id$/i.test(p.name))?.name ??
+        analysis.profiles.find((p) => p.type === 'number')?.name ??
+        '',
+    )
+    setAgg('sum')
+  }, [])
+
+  const ingestFile = useCallback(
+    async (file: File) => {
+      const format = detectFormat(file.name)
+      if (!format) {
+        setError(`Unsupported file type. Accepted: ${ACCEPT_ATTR.replaceAll(',', ', ')}.`)
         return
       }
       setError(null)
-      setResult(analysis)
-      setDimension(
-        analysis.profiles.find((p) => p.type === 'string')?.name ??
-          analysis.profiles.find((p) => p.type === 'date')?.name ??
-          analysis.fields[0],
-      )
-      setMeasure(
-        analysis.profiles.find((p) => p.type === 'number' && !/_?id$/i.test(p.name))?.name ??
-          analysis.profiles.find((p) => p.type === 'number')?.name ??
-          '',
-      )
-      setAgg('sum')
-    } catch {
-      setError('Could not parse this file. Please upload a valid CSV.')
-      setResult(null)
-    }
-  }, [])
+      setLoading(true)
+      try {
+        if (format === 'Excel') {
+          applyResult(await analyzeExcelFile(file))
+        } else {
+          const text = await file.text()
+          applyResult(analyzeText(text, file.name, format))
+        }
+      } catch {
+        setError('Could not parse this file. Check that it is a valid table, JSON or Excel workbook.')
+        setResult(null)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [applyResult],
+  )
 
   const onFiles = useCallback(
     (files: FileList | null) => {
       const file = files?.[0]
-      if (!file) return
-      if (!/\.csv$/i.test(file.name) && file.type !== 'text/csv') {
-        setError('Only CSV files are supported in this demo.')
-        return
-      }
-      setError(null)
-      const reader = new FileReader()
-      reader.onload = () => ingest(String(reader.result ?? ''), file.name)
-      reader.onerror = () => setError('Could not read the file.')
-      reader.readAsText(file)
+      if (file) void ingestFile(file)
     },
-    [ingest],
+    [ingestFile],
   )
 
   const onDrop = (e: DragEvent) => {
@@ -103,7 +123,7 @@ export function DataStudio() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = result.fileName.replace(/\.csv$/i, '') + '-clean.csv'
+    a.download = result.fileName.replace(/\.[^.]+$/, '') + '-clean.csv'
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -123,7 +143,7 @@ export function DataStudio() {
             Live demo — data preparation studio
           </p>
           <h2 className="max-w-2xl font-display text-4xl font-bold leading-[1.05] tracking-tight md:text-5xl">
-            <SplitText text="Drop a CSV." />
+            <SplitText text="Drop any data file." />
             <br />
             <span className="text-muted-foreground">
               <SplitText text="See what we'd flag." delay={0.15} />
@@ -132,8 +152,8 @@ export function DataStudio() {
         </div>
         <p className="max-w-sm text-[15px] leading-relaxed text-muted-foreground">
           A working slice of the platform's data studio, running entirely in your browser.
-          Nothing is uploaded — profiling, validation and charting happen locally, and
-          quarantined rows are explained, never silently changed.
+          Any domain, any tabular format — profiling, validation and charting happen locally,
+          and quarantined rows are explained, never silently changed.
         </p>
       </div>
 
@@ -153,33 +173,41 @@ export function DataStudio() {
           >
             <Upload className={cn('mb-5 h-9 w-9 transition-colors', dragging ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
             <p className="font-display text-xl font-bold tracking-tight">
-              {dragging ? 'Drop it — we take it from here' : 'Drag & drop a CSV file'}
+              {loading ? 'Parsing…' : dragging ? 'Drop it — we take it from here' : 'Drag & drop your data'}
             </p>
             <p className="mt-2 max-w-md text-[14px] leading-relaxed text-muted-foreground">
-              Sales, inventory, purchasing exports — anything with a header row. Your file
-              never leaves this browser tab.
+              CSV, Excel, JSON or TSV — sales, HR, marketing, finance, anything with records
+              and fields. Your file never leaves this browser tab.
             </p>
             <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
               <Button
                 onClick={() => inputRef.current?.click()}
+                disabled={loading}
                 className="h-11 cursor-pointer rounded-md bg-primary px-6 font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-primary-foreground hover:bg-primary/85"
               >
-                Choose CSV file
+                Choose a file
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => ingest(sampleCsv(), 'sample-orders.csv')}
-                className="h-11 cursor-pointer rounded-md border-border bg-transparent px-6 font-mono text-[12px] font-medium uppercase tracking-[0.08em] text-foreground hover:bg-secondary"
-              >
-                Try sample data
-              </Button>
+              <div className="flex items-center gap-1.5" role="group" aria-label="Sample datasets">
+                <span className="mr-1 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">or try:</span>
+                {SAMPLE_DATASETS.map((s) => (
+                  <Button
+                    key={s.id}
+                    variant="outline"
+                    onClick={() => applyResult(s.load())}
+                    className="h-11 cursor-pointer rounded-md border-border bg-transparent px-4 font-mono text-[11px] uppercase tracking-[0.08em] text-foreground hover:bg-secondary"
+                  >
+                    {s.label}
+                    <span className="ml-1.5 text-[9.5px] text-muted-foreground">{s.format}</span>
+                  </Button>
+                ))}
+              </div>
             </div>
             <input
               ref={inputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept={ACCEPT_ATTR}
               className="hidden"
-              aria-label="Upload CSV file"
+              aria-label="Upload data file"
               onChange={(e) => onFiles(e.target.files)}
             />
             {error && (
@@ -197,6 +225,9 @@ export function DataStudio() {
             <span className="flex items-center gap-2 font-mono text-[12.5px] text-foreground">
               <FileSpreadsheet className="h-4 w-4 text-primary" aria-hidden="true" />
               {result.fileName}
+            </span>
+            <span className="rounded-sm bg-secondary px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
+              {result.format}
             </span>
             <span className="font-mono text-[12px] uppercase tracking-[0.08em] text-muted-foreground">
               {result.rows.length.toLocaleString()} rows · {result.fields.length} columns

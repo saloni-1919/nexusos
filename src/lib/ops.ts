@@ -11,6 +11,8 @@ export interface Product {
   stock: number
   reorderPoint: number
   unitCost: number
+  /** preferred supplier used by the auto-reorder corrective workflow */
+  supplierId: string
 }
 
 export interface PurchaseOrder {
@@ -54,10 +56,10 @@ export function initialOpsState(): OpsState {
       { id: 'SUP-03', name: 'Meridian Metals' },
     ],
     products: [
-      { sku: 'WDG-A', name: 'Widget A', stock: 34, reorderPoint: 50, unitCost: 42.0 },
-      { sku: 'WDG-B', name: 'Widget B', stock: 120, reorderPoint: 60, unitCost: 28.5 },
-      { sku: 'GDG-X', name: 'Gadget X', stock: 12, reorderPoint: 40, unitCost: 96.75 },
-      { sku: 'CMP-Z', name: 'Component Z', stock: 210, reorderPoint: 80, unitCost: 11.2 },
+      { sku: 'WDG-A', name: 'Widget A', stock: 34, reorderPoint: 50, unitCost: 42.0, supplierId: 'SUP-01' },
+      { sku: 'WDG-B', name: 'Widget B', stock: 120, reorderPoint: 60, unitCost: 28.5, supplierId: 'SUP-01' },
+      { sku: 'GDG-X', name: 'Gadget X', stock: 12, reorderPoint: 40, unitCost: 96.75, supplierId: 'SUP-03' },
+      { sku: 'CMP-Z', name: 'Component Z', stock: 210, reorderPoint: 80, unitCost: 11.2, supplierId: 'SUP-02' },
     ],
     orders: [
       {
@@ -94,6 +96,9 @@ export function loadOpsState(): OpsState {
       const parsed = JSON.parse(raw) as OpsState
       // migrate states persisted by older versions
       if (!Array.isArray(parsed.dismissedAlerts)) parsed.dismissedAlerts = []
+      parsed.products = parsed.products.map((p) =>
+        p.supplierId ? p : { ...p, supplierId: initialOpsState().products.find((x) => x.sku === p.sku)?.supplierId ?? 'SUP-01' },
+      )
       return parsed
     }
   } catch {
@@ -184,6 +189,52 @@ export function dismissAlert(state: OpsState, sku: string): OpsState {
     ...state,
     dismissedAlerts: [...state.dismissedAlerts, sku],
     events: [{ at: now(), text: `Low-stock alert for ${sku} acknowledged`, tone: 'warn' as const }, ...state.events].slice(0, 30),
+  }
+}
+
+/** Open (pending or approved) PO already covering a product, if any. */
+export function openPoForProduct(state: OpsState, sku: string): PurchaseOrder | undefined {
+  return state.orders.find((o) => o.productSku === sku && o.status !== 'received')
+}
+
+/** Quantity that brings stock back to 2× the reorder point — the healthy-zone target. */
+export function reorderQty(product: Product): number {
+  return Math.max(product.reorderPoint * 2 - product.stock, 1)
+}
+
+/**
+ * Corrective workflow: a threshold alert turns into an approval-gated reorder PO
+ * for the shortfall, with the product's preferred supplier. No-op when an open PO
+ * for the product already exists.
+ */
+export function createReorderPO(state: OpsState, sku: string): OpsState {
+  const product = state.products.find((p) => p.sku === sku)
+  if (!product || product.stock >= product.reorderPoint) return state
+  if (openPoForProduct(state, sku)) return state
+  const qty = reorderQty(product)
+  const id = `PO-${state.nextPoNum}`
+  const po: PurchaseOrder = {
+    id,
+    supplierId: product.supplierId,
+    productSku: sku,
+    qty,
+    status: 'pending',
+    createdAt: now(),
+    total: Math.round(qty * product.unitCost * 100) / 100,
+  }
+  const supplier = state.suppliers.find((s) => s.id === product.supplierId)
+  return {
+    ...state,
+    nextPoNum: state.nextPoNum + 1,
+    orders: [po, ...state.orders],
+    events: [
+      {
+        at: now(),
+        text: `Corrective action — low-stock alert on ${product.name} auto-created ${id}: ${qty} units from ${supplier?.name ?? product.supplierId} ($${po.total.toLocaleString()}), awaiting approval`,
+        tone: 'warn' as const,
+      },
+      ...state.events,
+    ].slice(0, 30),
   }
 }
 

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { BellRing, X, LayoutDashboard } from 'lucide-react'
+import { BellRing, X, LayoutDashboard, PackagePlus, FileDown, ArrowRight } from 'lucide-react'
 import {
   Bar,
   BarChart,
@@ -15,7 +15,8 @@ import {
 } from 'recharts'
 import { SplitText } from '@/components/reactbits/SplitText'
 import { Reveal } from '@/components/Reveal'
-import { activeAlerts } from '@/lib/ops'
+import { activeAlerts, openPoForProduct, reorderQty } from '@/lib/ops'
+import { buildReportMarkdown, reportFileName } from '@/lib/report'
 import { useOps } from '@/lib/opsStore'
 import { cn } from '@/lib/utils'
 
@@ -35,8 +36,18 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export function Dashboard() {
-  const { state, dismissAlert } = useOps()
+  const { state, dismissAlert, reorderPO } = useOps()
   const alerts = useMemo(() => activeAlerts(state), [state])
+
+  const exportReport = () => {
+    const blob = new Blob([buildReportMarkdown(state)], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = reportFileName()
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const spendBySupplier = useMemo(() => {
     const map = new Map<string, number>()
@@ -84,9 +95,27 @@ export function Dashboard() {
         <p className="max-w-sm text-[15px] leading-relaxed text-muted-foreground">
           No mock data here — every chart below renders from the purchase orders and
           inventory you created in the Operations demo above. Threshold alerts fire
-          automatically when stock drops below its reorder point.
+          automatically, and one click turns an alert into an approval-gated reorder PO.
         </p>
       </div>
+
+      {/* report export */}
+      <Reveal y={12}>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-4">
+          <p className="text-[13.5px] text-muted-foreground">
+            <span className="font-medium text-foreground">Management snapshot</span> — KPIs, inventory position,
+            open POs and active alerts, compiled from live state.
+          </p>
+          <button
+            type="button"
+            onClick={exportReport}
+            className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-transparent px-4 font-mono text-[11px] uppercase tracking-[0.08em] text-foreground transition-colors hover:bg-secondary"
+          >
+            <FileDown className="h-3.5 w-3.5" aria-hidden="true" />
+            Export report (.md)
+          </button>
+        </div>
+      </Reveal>
 
       {/* threshold alerts */}
       <Reveal y={16}>
@@ -110,27 +139,48 @@ export function Dashboard() {
             </p>
           ) : (
             <ul className="mt-3 space-y-2.5">
-              {alerts.map((p) => (
-                <li
-                  key={p.sku}
-                  className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/25 bg-background/60 px-4 py-3"
-                >
-                  <span className="text-[13.5px] text-foreground">
-                    <span className="font-medium">{p.name}</span> is below its reorder point:{' '}
-                    <span className="font-mono text-destructive">{p.stock} in stock</span>
-                    <span className="font-mono text-muted-foreground"> / {p.reorderPoint} threshold</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => dismissAlert(p.sku)}
-                    className="ml-auto flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    aria-label={`Dismiss low-stock alert for ${p.name}`}
+              {alerts.map((p) => {
+                const openPo = openPoForProduct(state, p.sku)
+                return (
+                  <li
+                    key={p.sku}
+                    className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/25 bg-background/60 px-4 py-3"
                   >
-                    <X className="h-3 w-3" aria-hidden="true" />
-                    Acknowledge
-                  </button>
-                </li>
-              ))}
+                    <span className="text-[13.5px] text-foreground">
+                      <span className="font-medium">{p.name}</span> is below its reorder point:{' '}
+                      <span className="font-mono text-destructive">{p.stock} in stock</span>
+                      <span className="font-mono text-muted-foreground"> / {p.reorderPoint} threshold</span>
+                    </span>
+                    <span className="ml-auto flex flex-wrap items-center gap-2">
+                      {openPo ? (
+                        <span className="flex items-center gap-1.5 rounded-md border border-signal/40 bg-signal/10 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.06em] text-signal">
+                          <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                          {openPo.id} {openPo.status}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => reorderPO(p.sku)}
+                          className="flex h-8 cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 font-mono text-[11px] uppercase tracking-[0.06em] text-primary-foreground transition-colors hover:bg-primary/85"
+                          aria-label={`Auto-create reorder PO for ${p.name}`}
+                        >
+                          <PackagePlus className="h-3.5 w-3.5" aria-hidden="true" />
+                          Auto-reorder {reorderQty(p)} units
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => dismissAlert(p.sku)}
+                        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 font-mono text-[11px] uppercase tracking-[0.06em] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        aria-label={`Dismiss low-stock alert for ${p.name}`}
+                      >
+                        <X className="h-3 w-3" aria-hidden="true" />
+                        Acknowledge
+                      </button>
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>
